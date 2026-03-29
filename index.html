@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TomTomTuscia">
+<meta name="application-name" content="TomTomTuscia">
+<meta name="theme-color" content="#1a1208">
+<title>TomTomTuscia</title>
+<!-- Icona per iPhone (schermata home) -->
+<link rel="apple-touch-icon" href="icon-180.png">
+<!-- Icona per Android / PWA -->
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root {
+  --ink:#1a1208; --ink2:#110e07; --parchment:#f5efe3;
+  --stone:#9e9485; --accent:#c8521a; --gold:#c9982a;
+  --moss:#4a6741; --green:#7ec86e;
+  --bar:56px; --peek:76px; --safe:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;width:100%;font-family:'DM Sans',sans-serif;background:var(--ink);color:var(--parchment);overflow:hidden;overscroll-behavior:none;}
+
+/* TOP BAR */
+#topbar{position:fixed;top:0;left:0;right:0;height:var(--bar);background:var(--ink);border-bottom:1px solid rgba(200,170,100,0.15);display:flex;align-items:center;justify-content:space-between;padding:0 18px;z-index:500;}
+.logo-title{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:700;color:var(--parchment);}
+.logo-sub{font-size:0.58rem;color:var(--stone);letter-spacing:0.15em;text-transform:uppercase;margin-top:1px;}
+.trail-count{background:rgba(200,170,100,0.12);border:1px solid rgba(200,170,100,0.25);border-radius:20px;padding:5px 12px;font-size:0.72rem;font-weight:600;color:var(--gold);}
+
+/* FILTRI */
+#filters{position:fixed;top:var(--bar);left:0;right:0;height:52px;display:flex;align-items:center;gap:8px;padding:0 16px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;z-index:400;pointer-events:all;}
+#filters::-webkit-scrollbar{display:none;}
+.fp{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:24px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(26,18,8,0.9);color:var(--stone);font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:500;cursor:pointer;white-space:nowrap;min-height:40px;backdrop-filter:blur(8px);transition:all 0.2s;}
+.fp.a-all{background:rgba(201,152,42,0.2);border-color:var(--gold);color:var(--gold);}
+.fp.a-easy{background:rgba(74,103,65,0.3);border-color:var(--green);color:var(--green);}
+.fp.a-med{background:rgba(201,152,42,0.2);border-color:var(--gold);color:var(--gold);}
+.fp.a-hard{background:rgba(200,82,26,0.25);border-color:var(--accent);color:var(--accent);}
+
+/* MAPPA */
+#map{position:fixed;top:0;left:0;right:0;bottom:0;z-index:1;}
+
+/* BOTTOM SHEET */
+#sheet{position:fixed;left:0;right:0;bottom:0;background:var(--ink2);border-radius:20px 20px 0 0;box-shadow:0 -4px 32px rgba(0,0,0,0.5);z-index:300;height:75vh;transform:translateY(calc(75vh - var(--peek) - var(--safe)));transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);will-change:transform;}
+#sheet.open{transform:translateY(0);}
+#sh-handle{display:flex;flex-direction:column;align-items:center;padding:12px 0 10px;cursor:pointer;user-select:none;}
+#sh-bar{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,0.18);margin-bottom:7px;}
+#sh-label{font-size:0.7rem;font-weight:600;color:var(--stone);letter-spacing:0.08em;text-transform:uppercase;}
+#trail-list{overflow-y:auto;-webkit-overflow-scrolling:touch;height:calc(75vh - 58px);padding:4px 0 calc(20px + var(--safe));}
+#trail-list::-webkit-scrollbar{display:none;}
+.trow{display:flex;align-items:center;padding:14px 18px;gap:12px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;min-height:70px;transition:background 0.15s;}
+.trow:active{background:rgba(255,255,255,0.06);}
+.trow.dim{opacity:0.2;}
+.tbar{width:4px;height:38px;border-radius:2px;flex-shrink:0;}
+.tinfo{flex:1;min-width:0;}
+.tname{font-size:0.9rem;font-weight:600;color:var(--parchment);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;}
+.tmeta{display:flex;gap:10px;font-size:0.72rem;color:var(--stone);}
+.chip{font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:4px 9px;border-radius:8px;flex-shrink:0;align-self:center;}
+.c-easy{background:rgba(74,103,65,0.3);color:var(--green);}
+.c-med{background:rgba(201,152,42,0.2);color:var(--gold);}
+.c-hard{background:rgba(200,82,26,0.22);color:var(--accent);}
+
+/* DETAIL CARD */
+#detail{position:fixed;left:0;right:0;bottom:0;background:var(--ink2);border-radius:20px 20px 0 0;box-shadow:0 -4px 40px rgba(0,0,0,0.65);z-index:600;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);will-change:transform;}
+#detail.open{transform:translateY(0);}
+#dh{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 18px 12px;border-bottom:1px solid rgba(255,255,255,0.07);}
+#dstrip{width:4px;border-radius:2px;flex-shrink:0;margin-right:12px;align-self:stretch;min-height:42px;}
+#dtitles{flex:1;}
+#dtype{font-size:0.58rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--stone);margin-bottom:3px;}
+#dname{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--parchment);line-height:1.25;}
+#dsub{font-size:0.78rem;color:var(--stone);margin-top:2px;}
+#btnx{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--stone);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s;}
+#btnx:active{background:rgba(255,255,255,0.16);}
+#dstats{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid rgba(255,255,255,0.07);}
+.sc{padding:13px 6px;text-align:center;border-right:1px solid rgba(255,255,255,0.06);}
+.sc:last-child{border-right:none;}
+.si{font-size:1rem;display:block;margin-bottom:3px;}
+.sv{font-size:0.85rem;font-weight:600;color:var(--parchment);display:block;}
+.sl{font-size:0.56rem;color:var(--stone);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-top:2px;}
+#ddesc{padding:14px 18px;font-size:0.8rem;color:var(--stone);line-height:1.6;border-bottom:1px solid rgba(255,255,255,0.07);}
+#btndl{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px 18px calc(14px + var(--safe));padding:16px;background:var(--accent);color:white;border:none;border-radius:14px;font-family:'DM Sans',sans-serif;font-size:0.95rem;font-weight:600;cursor:pointer;text-decoration:none;min-height:54px;transition:opacity 0.2s;}
+#btndl:active{opacity:0.8;}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:9999;transition:opacity 0.4s;}
+#loading.hidden{opacity:0;pointer-events:none;}
+.spinner{width:36px;height:36px;border:3px solid rgba(200,170,100,0.15);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.ltxt{font-size:0.8rem;color:var(--stone);}
+
+/* OVERLAY */
+#ov{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.3);display:none;}
+#ov.on{display:block;}
+
+/* LEAFLET */
+.leaflet-container{background:#2a2317;}
+.leaflet-control-zoom{margin-bottom:calc(var(--peek) + 20px + var(--safe)) !important;}
+.leaflet-control-attribution{background:rgba(26,18,8,0.8) !important;color:var(--stone) !important;font-size:0.55rem !important;}
+.leaflet-control-attribution a{color:var(--gold) !important;}
+.leaflet-bar a{background:var(--ink2) !important;color:var(--parchment) !important;border-color:rgba(200,170,100,0.2) !important;width:40px !important;height:40px !important;line-height:40px !important;font-size:1.1rem !important;}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div>
+    <div class="logo-title">TomTomTuscia</div>
+    <div class="logo-sub">Viterbo · Tuscia</div>
+  </div>
+  <div class="trail-count" id="cnt">11 percorsi</div>
+</div>
+
+<div id="filters">
+  <button class="fp a-all" data-f="all">🗺️ Tutti</button>
+  <button class="fp" data-f="easy">🟢 Facile</button>
+  <button class="fp" data-f="med">🟡 Medio</button>
+  <button class="fp" data-f="hard">🔴 Difficile</button>
+</div>
+
+<div id="map"></div>
+<div id="ov"></div>
+
+<div id="sheet">
+  <div id="sh-handle">
+    <div id="sh-bar"></div>
+    <div id="sh-label">Scorri per i percorsi</div>
+  </div>
+  <div id="trail-list"></div>
+</div>
+
+<div id="detail">
+  <div id="dh">
+    <div id="dstrip"></div>
+    <div id="dtitles">
+      <div id="dtype"></div>
+      <div id="dname"></div>
+      <div id="dsub"></div>
+    </div>
+    <button id="btnx">✕</button>
+  </div>
+  <div id="dstats">
+    <div class="sc"><span class="si">📏</span><span class="sv" id="d-km">–</span><span class="sl">km</span></div>
+    <div class="sc"><span class="si">⛰️</span><span class="sv" id="d-el">–</span><span class="sl">salita</span></div>
+    <div class="sc"><span class="si">⏱️</span><span class="sv" id="d-t">–</span><span class="sl">durata</span></div>
+    <div class="sc"><span class="si">🎯</span><span class="sv" id="d-df">–</span><span class="sl">difficoltà</span></div>
+  </div>
+  <div id="ddesc"></div>
+  <a id="btndl" href="#" download>⬇️ Scarica traccia GPX</a>
+</div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="ltxt">Caricamento mappa…</div>
+</div>
+
+<script>
+const trails=[
+  {id:1,file:"gpx/Anello_Blera-Barbarano-_Sentiero_delle_Mole-.gpx",name:"Anello Blera – Barbarano",sub:"Sentiero delle Mole",type:"Trekking ad anello",color:"#c8521a",km:"11.9",elev:"+1092m",time:"6h 00min",diff:"hard",desc:"Anello tra Blera e Barbarano Romano lungo il Sentiero delle Mole, tra forre tufacee, mulini abbandonati e paesaggi etruschi. Il dislivello cumulativo lo rende il percorso più impegnativo della collezione.",coords:[[42.273751,12.025895],[42.272946,12.026665],[42.271755,12.026981],[42.271014,12.027479],[42.270705,12.028208],[42.270137,12.030136],[42.269239,12.031642],[42.269122,12.0334],[42.268843,12.035153],[42.268387,12.036406],[42.267472,12.03678],[42.266796,12.037678],[42.265551,12.037983],[42.264474,12.039286],[42.264167,12.039928],[42.263684,12.041151],[42.263262,12.041924],[42.262919,12.043138],[42.262392,12.044448],[42.261884,12.045337],[42.261435,12.046931],[42.260984,12.048606],[42.260732,12.050027],[42.260024,12.051537],[42.259679,12.052505],[42.259258,12.054373],[42.259085,12.056059],[42.258827,12.057707],[42.258974,12.05938],[42.259504,12.058024],[42.260059,12.056679],[42.2606,12.057157],[42.259987,12.056275],[42.259824,12.05769],[42.258777,12.059082],[42.257892,12.059693],[42.257094,12.061385],[42.256112,12.062298],[42.254894,12.063389],[42.254131,12.064446],[42.252927,12.06439],[42.252041,12.06446],[42.252121,12.065526],[42.253223,12.065263],[42.252055,12.065611],[42.251755,12.064303],[42.251643,12.063076],[42.250185,12.062002],[42.249943,12.060416],[42.250486,12.059798],[42.251552,12.059594],[42.253061,12.059137],[42.254696,12.058185],[42.256021,12.056796],[42.25716,12.054839],[42.257759,12.05315],[42.258289,12.05136],[42.258945,12.049093],[42.259552,12.046978],[42.25987,12.045849],[42.260478,12.043775],[42.261196,12.041785],[42.262039,12.039895],[42.262788,12.038275],[42.263381,12.036939],[42.263994,12.035493],[42.264817,12.033751],[42.265177,12.032842],[42.265455,12.032201],[42.266502,12.029882],[42.267072,12.028659],[42.26813,12.026526],[42.269051,12.02574],[42.270343,12.025245],[42.27081,12.026505],[42.271856,12.027404],[42.272658,12.027655]]},
+  {id:2,file:"gpx/Castel_guiliano_corretto.gpx",name:"Castel Giuliano",sub:"",type:"Escursione",color:"#2e7ab5",km:"2.9",elev:"+241m",time:"2h 00min",diff:"med",desc:"Breve escursione nei pressi di Castel Giuliano, tra boschi e paesaggio collinare. Percorso con buon dislivello relativo alla lunghezza, adatto a chi cerca un po' di salita in poco tempo.",coords:[[42.034996,12.127413],[42.034683,12.127584],[42.034551,12.128029],[42.034273,12.128384],[42.03413,12.12864],[42.03415,12.128942],[42.034138,12.129301],[42.03426,12.129636],[42.034434,12.130059],[42.034478,12.12984],[42.034497,12.129365],[42.03471,12.128835],[42.035055,12.128272],[42.035252,12.127833],[42.035407,12.127412],[42.035593,12.127269],[42.035902,12.127411],[42.036144,12.127374],[42.036342,12.127183],[42.036571,12.126934],[42.036825,12.126657],[42.037273,12.12621],[42.037709,12.125831],[42.03817,12.125802],[42.038747,12.125834],[42.039253,12.125794],[42.039809,12.12575],[42.040042,12.125701],[42.040394,12.125594],[42.040517,12.125432],[42.04076,12.125505],[42.041116,12.125217],[42.041692,12.124747],[42.042249,12.124262],[42.042813,12.123764],[42.043432,12.123524],[42.04402,12.123423],[42.044626,12.123233],[42.045063,12.123218],[42.04543,12.123081],[42.045828,12.122802],[42.046488,12.122568],[42.047084,12.122252],[42.047662,12.122266],[42.047892,12.122421],[42.048072,12.122769],[42.048431,12.12293],[42.048705,12.123112],[42.049202,12.123328],[42.049488,12.123707],[42.049771,12.124062],[42.050166,12.124873],[42.050374,12.125247],[42.050689,12.125633],[42.051129,12.125969],[42.051334,12.126227],[42.051599,12.126301],[42.05186,12.126389],[42.052158,12.126354],[42.052514,12.126432],[42.052892,12.126377],[42.053043,12.12603]]},
+  {id:3,file:"gpx/Eremo_San_Leonardo_Vallerano.gpx",name:"Eremo San Leonardo",sub:"Vallerano",type:"Trekking spirituale",color:"#9e5c8c",km:"2.4",elev:"+285m",time:"2h 00min",diff:"easy",desc:"Salita all'Eremo di San Leonardo nei pressi di Vallerano, tra boschi di faggio e panorami sul Cimino. Percorso breve ma con pendenza sostenuta e quota elevata.",coords:[[42.349722,12.22708],[42.349735,12.227073],[42.349739,12.226868],[42.34983,12.226754],[42.349936,12.226497],[42.349974,12.226103],[42.349991,12.225717],[42.34998,12.225323],[42.349974,12.22491],[42.350073,12.224496],[42.350116,12.224137],[42.350174,12.223805],[42.350209,12.223593],[42.350356,12.223327],[42.350519,12.223166],[42.350673,12.223025],[42.350941,12.222753],[42.351214,12.222454],[42.351551,12.2221],[42.351759,12.221871],[42.352139,12.221559],[42.352342,12.221308],[42.352482,12.221166],[42.352715,12.220934],[42.352924,12.220694],[42.353112,12.220341],[42.353241,12.22008],[42.353345,12.219768],[42.353467,12.219489],[42.353603,12.219165],[42.353737,12.218866],[42.353602,12.218447],[42.353663,12.217947],[42.353721,12.217581],[42.35365,12.217205],[42.353443,12.217148],[42.353162,12.217262],[42.35294,12.217331],[42.352757,12.217282],[42.352684,12.216777],[42.352694,12.216576],[42.352696,12.216259],[42.352528,12.216019],[42.352261,12.216032],[42.351988,12.216204],[42.351781,12.216421],[42.351713,12.216478],[42.351464,12.216695],[42.351276,12.216888],[42.35125,12.216615],[42.351313,12.216135],[42.351446,12.215686],[42.351551,12.215357],[42.351725,12.21505],[42.351814,12.214673],[42.351807,12.214323],[42.351674,12.214145],[42.351372,12.213915],[42.351122,12.213792],[42.351023,12.21353],[42.351083,12.213142],[42.351192,12.212733],[42.35128,12.212715],[42.351381,12.212603],[42.351635,12.212393],[42.351898,12.212085],[42.352152,12.211827],[42.352404,12.211479],[42.352556,12.21124],[42.352651,12.211037],[42.35287,12.210738],[42.353037,12.210497],[42.353172,12.210226],[42.353325,12.209945],[42.353599,12.21004],[42.353719,12.209774],[42.353845,12.209455],[42.353969,12.209122],[42.354044,12.208829],[42.354124,12.208592],[42.354223,12.208273],[42.35432,12.207943],[42.354484,12.207653]]},
+  {id:4,file:"gpx/Forchetta_del_Diavolo-_Monte_Leano.gpx",name:"Forchetta del Diavolo",sub:"Monte Leano",type:"Sentiero panoramico",color:"#c9982a",km:"0.7",elev:"+62m",time:"1h 00min",diff:"easy",desc:"Breve ma suggestivo sentiero verso la Forchetta del Diavolo sul Monte Leano, con vedute aperte sulla Maremma laziale e il litorale. Ideale come gita veloce o punto panoramico.",coords:[[42.506989,11.961469],[42.507041,11.961383],[42.506984,11.961459],[42.506947,11.961476],[42.50685,11.961486],[42.506817,11.961486],[42.506787,11.961496],[42.506732,11.961502],[42.506661,11.961501],[42.506565,11.96154],[42.506628,11.961643],[42.506722,11.96178],[42.506883,11.962043],[42.507013,11.962225],[42.507174,11.962248],[42.507374,11.962331],[42.507583,11.962471],[42.507695,11.962606],[42.507798,11.962778],[42.507816,11.962823],[42.507865,11.962904],[42.507904,11.962964],[42.507918,11.963055],[42.507909,11.963078],[42.507862,11.963095],[42.507798,11.963097],[42.507612,11.96305],[42.50759,11.963046],[42.507441,11.96304],[42.507324,11.963029],[42.507207,11.963045],[42.507066,11.96306],[42.506917,11.96311],[42.506818,11.963129],[42.506666,11.963135],[42.506518,11.963112],[42.506315,11.963093],[42.506178,11.963105],[42.505968,11.963219],[42.505806,11.963307],[42.505729,11.963331],[42.505501,11.963371],[42.505334,11.963251],[42.505263,11.963229],[42.505302,11.963275],[42.505359,11.963347],[42.505368,11.96336],[42.505429,11.963384],[42.505532,11.963417],[42.505528,11.96344],[42.50552,11.963509],[42.505514,11.963537],[42.505496,11.963731],[42.505495,11.963841],[42.505505,11.963993]]},
+  {id:5,file:"gpx/Forre_di_Corchiano.gpx",name:"Forre di Corchiano",sub:"Cascate",type:"Canyon e cascate",color:"#2e9b7a",km:"4.0",elev:"+452m",time:"3h 00min",diff:"med",desc:"Esplorazione delle forre tufacee di Corchiano, tra pareti verticali, vegetazione fitta e cascate. Il percorso scende e risale ripetutamente il canyon, con tratti tecnici e grande fascino naturalistico.",coords:[[42.345312,12.345366],[42.345385,12.345658],[42.345102,12.346219],[42.345062,12.346747],[42.345386,12.346963],[42.345825,12.346973],[42.34596,12.347248],[42.345961,12.3473],[42.345829,12.3475],[42.345616,12.34764],[42.34535,12.34762],[42.344893,12.347737],[42.344408,12.348304],[42.344197,12.348792],[42.344255,12.349176],[42.344523,12.349448],[42.344562,12.349918],[42.344291,12.35011],[42.343843,12.350539],[42.34367,12.350802],[42.343462,12.351149],[42.34322,12.351543],[42.343245,12.351794],[42.343206,12.351948],[42.342978,12.352375],[42.342871,12.352664],[42.342979,12.352951],[42.342783,12.353426],[42.342956,12.353553],[42.343206,12.35353],[42.343364,12.353752],[42.343162,12.354031],[42.343012,12.354493],[42.342833,12.354708],[42.342652,12.354855],[42.342881,12.355059],[42.343311,12.355322],[42.343525,12.355596],[42.343658,12.356088],[42.343699,12.35641],[42.34364,12.356515],[42.343701,12.356915],[42.343652,12.357143],[42.343227,12.357341],[42.343039,12.357381],[42.342806,12.35779],[42.342981,12.358013],[42.343236,12.357974],[42.343664,12.357716],[42.344046,12.358033],[42.344157,12.358548],[42.344598,12.358946],[42.345063,12.358957],[42.34567,12.359032],[42.346153,12.359706],[42.346301,12.360342],[42.346252,12.360929],[42.34628,12.361455],[42.346368,12.362241],[42.346416,12.362987],[42.346699,12.363634],[42.347068,12.363656],[42.347151,12.363403],[42.34724,12.363697],[42.347254,12.36415],[42.347378,12.364813],[42.347316,12.365131],[42.346942,12.365551],[42.347018,12.365816],[42.347234,12.366306],[42.346815,12.366108],[42.346843,12.366215],[42.347178,12.366389],[42.347067,12.365976],[42.34701,12.365587],[42.34736,12.365022],[42.347309,12.364547],[42.347226,12.364058],[42.347182,12.363342],[42.347207,12.363052],[42.347184,12.362459],[42.3472,12.361958],[42.347253,12.361595],[42.347037,12.361168],[42.346992,12.360068],[42.347143,12.359918],[42.347393,12.35941],[42.347005,12.358886],[42.346776,12.358535],[42.346512,12.358113],[42.346483,12.358012],[42.346109,12.357623],[42.345874,12.357166],[42.345631,12.35677]]},
+  {id:6,file:"gpx/Infernaccio.gpx",name:"Infernaccio",sub:"",type:"Sentiero naturalistico",color:"#b04040",km:"0.8",elev:"N/D",time:"1h 30min",diff:"med",desc:"Breve sentiero dell'Infernaccio, suggestivo percorso in un'area naturale dalla forte personalità. Ideale come escursione veloce o per esplorare la zona prima di percorsi più lunghi.",coords:[[42.531835,12.126729],[42.531513,12.127069],[42.531249,12.127411],[42.531008,12.127831],[42.53085,12.128345],[42.530694,12.128833],[42.53051,12.129216],[42.530297,12.129554],[42.530172,12.130099],[42.529957,12.13039],[42.529769,12.130559],[42.529511,12.130451],[42.529224,12.130378],[42.528961,12.130306],[42.528736,12.130171],[42.528434,12.130182],[42.52827,12.130408],[42.528125,12.130346],[42.528047,12.130231],[42.528108,12.130103],[42.528138,12.129921],[42.527982,12.129802],[42.527803,12.129906],[42.527649,12.130167],[42.527567,12.13045],[42.527471,12.130718],[42.527374,12.130949],[42.527339,12.131157]]},
+  {id:7,file:"gpx/Monte_Palanzana.gpx",name:"Monte Palanzana",sub:"",type:"Trekking montano",color:"#4a6741",km:"4.3",elev:"N/D",time:"3h 30min",diff:"hard",desc:"Percorso sul Monte Palanzana, rilievo dei Monti Cimini a nord di Viterbo. Sentiero tra boschi di cerro e castagno con vedute sul lago di Vico e sulla conca viterbese.",coords:[[42.409909,12.142741],[42.4098,12.143318],[42.409225,12.143565],[42.408523,12.143803],[42.407579,12.144113],[42.407442,12.144437],[42.407447,12.144547],[42.407409,12.144876],[42.407441,12.145024],[42.407497,12.14516],[42.407554,12.14533],[42.407576,12.14548],[42.407604,12.145604],[42.407565,12.145824],[42.407524,12.146157],[42.407667,12.146457],[42.407504,12.146893],[42.407704,12.147147],[42.407919,12.147404],[42.407914,12.147622],[42.407896,12.147772],[42.40815,12.148163],[42.408202,12.14843],[42.407943,12.148548],[42.407942,12.148636],[42.407917,12.14882],[42.407992,12.149014],[42.408011,12.149194],[42.407885,12.14934],[42.407716,12.14939],[42.407453,12.149476],[42.407266,12.149738],[42.407155,12.14993],[42.406989,12.150069],[42.406929,12.150255],[42.407141,12.150376],[42.407087,12.150521],[42.407182,12.150691],[42.407194,12.150992],[42.406851,12.151432],[42.406695,12.151361],[42.406691,12.151606],[42.406569,12.152038],[42.406614,12.152478],[42.40662,12.153106],[42.406571,12.153615],[42.40674,12.153944],[42.406795,12.154248],[42.406868,12.154578],[42.407056,12.154874],[42.407021,12.155146],[42.407189,12.155338],[42.407175,12.155872],[42.406684,12.156251],[42.406167,12.156215],[42.405699,12.156113],[42.405313,12.156055],[42.404957,12.155667],[42.404795,12.155064],[42.404615,12.154612],[42.404283,12.154068],[42.403899,12.153848],[42.403388,12.153647],[42.402992,12.153984],[42.402476,12.154456],[42.401936,12.155161],[42.401397,12.15616],[42.400904,12.156815],[42.400609,12.157267],[42.400221,12.157769],[42.399911,12.158153],[42.399798,12.157824],[42.399856,12.156553],[42.400473,12.154928],[42.40096,12.151901],[42.401786,12.149459],[42.403069,12.147905],[42.404968,12.145905],[42.405856,12.145093],[42.40692,12.144404],[42.407438,12.144166]]},
+  {id:8,file:"gpx/Parco_del_Timone_Cellere.gpx",name:"Parco del Timone",sub:"Cellere",type:"Parco naturale",color:"#5a8a3c",km:"0.8",elev:"+79m",time:"1h 00min",diff:"easy",desc:"Breve anello nel Parco del Timone a Cellere, area naturale protetta nella Tuscia settentrionale. Ideale per famiglie o come passeggiata rilassante tra macchia mediterranea e panorami collinari.",coords:[[42.497419,11.752809],[42.496883,11.752596],[42.496086,11.752263],[42.495795,11.752189],[42.495444,11.752139],[42.495159,11.752067],[42.494878,11.751911],[42.494759,11.751675],[42.494737,11.751548],[42.494755,11.751443],[42.494836,11.751231],[42.494832,11.751108],[42.494815,11.751086],[42.494673,11.750855],[42.49461,11.75054],[42.494603,11.750265],[42.494521,11.749968],[42.494413,11.749671],[42.494421,11.749598],[42.494493,11.74922],[42.494533,11.748908],[42.494538,11.748761],[42.494557,11.748722],[42.494605,11.748619],[42.494624,11.748362],[42.494501,11.748049],[42.494333,11.74776],[42.494449,11.747391],[42.494635,11.747416],[42.494785,11.747595],[42.494899,11.747693],[42.494912,11.747747],[42.494882,11.747742],[42.494852,11.747798],[42.494848,11.747828],[42.494938,11.747803],[42.494969,11.747754],[42.495056,11.747817],[42.495033,11.747908],[42.495017,11.747956],[42.495031,11.748003],[42.495185,11.748064]]},
+  {id:9,file:"gpx/Percorso_eremno_di_poggiio_conte.gpx",name:"Eremo di Poggio Conte",sub:"",type:"Percorso storico",color:"#7a5c2e",km:"2.1",elev:"N/D",time:"1h 30min",diff:"med",desc:"Percorso che conduce all'antico Eremo di Poggio Conte, luogo di spiritualità e silenzio immerso nella campagna della Tuscia. Sentiero tranquillo adatto a tutti.",coords:[[42.518142,11.613262],[42.517761,11.612868],[42.517832,11.612534],[42.5177,11.6123],[42.517404,11.612306],[42.517205,11.612307],[42.517031,11.612276],[42.516809,11.612454],[42.516544,11.612744],[42.516045,11.613324],[42.515672,11.6138],[42.515415,11.614199],[42.514943,11.614485],[42.514498,11.614258],[42.514241,11.61391],[42.514101,11.613588],[42.513855,11.613082],[42.513496,11.613778],[42.512635,11.615216],[42.511589,11.616477],[42.510993,11.617961],[42.511004,11.619368],[42.511126,11.620601],[42.511425,11.621661],[42.511697,11.623005],[42.511961,11.623646],[42.511859,11.624126],[42.51162,11.624414],[42.511437,11.624685],[42.511145,11.624981],[42.510916,11.625254],[42.510695,11.625395],[42.510639,11.625605],[42.510767,11.625858],[42.510879,11.626099],[42.510629,11.625392],[42.510593,11.625292],[42.510574,11.625195],[42.510533,11.625115],[42.510458,11.625006],[42.510394,11.624903],[42.510284,11.624843],[42.510187,11.624792],[42.510068,11.624745],[42.509985,11.624716],[42.509892,11.6247]]},
+  {id:11,file:"gpx/Monte_venere-Pozzo_del_diavolo.gpx",name:"Monte Venere",sub:"Pozzo del Diavolo",type:"Trekking vulcanico",color:"#e05c00",km:"1.6",elev:"+321m",time:"2h 30min",diff:"hard",desc:"Salita ripida verso la vetta del Monte Venere, cono vulcanico che si affaccia sul Lago di Vico. Il Pozzo del Diavolo è una delle formazioni geologiche più suggestive dei Monti Cimini, con panorami eccezionali sul lago.",coords:[[42.352484,12.188955],[42.352438,12.188787],[42.35229,12.188595],[42.352158,12.18847],[42.352053,12.188285],[42.351948,12.188009],[42.351794,12.187933],[42.351634,12.187752],[42.351498,12.187529],[42.351353,12.187296],[42.351143,12.187187],[42.350941,12.187133],[42.350707,12.187064],[42.350534,12.187031],[42.35037,12.186994],[42.350306,12.186812],[42.350223,12.186597],[42.350015,12.186599],[42.34985,12.186665],[42.349717,12.186804],[42.349553,12.186868],[42.349411,12.186967],[42.349312,12.18704],[42.34921,12.187048],[42.349047,12.187082],[42.348856,12.187129],[42.348695,12.187176],[42.348524,12.187208],[42.348308,12.187167],[42.348131,12.187134],[42.347935,12.187147],[42.347965,12.187102],[42.347876,12.187068],[42.347689,12.187053],[42.347528,12.187081],[42.347412,12.187063],[42.347397,12.187044],[42.347309,12.187034],[42.347173,12.187006],[42.347,12.186969],[42.346845,12.186831],[42.346718,12.186704],[42.346603,12.186639],[42.346563,12.186578],[42.346534,12.186586],[42.346456,12.186437],[42.346416,12.186348],[42.346308,12.186302],[42.346209,12.186208],[42.346141,12.186088],[42.346046,12.185943],[42.345998,12.185845],[42.345964,12.185696],[42.345904,12.18555],[42.345835,12.185378],[42.34566,12.185185],[42.345526,12.185061],[42.345412,12.184892],[42.345301,12.184844],[42.345243,12.184635],[42.345206,12.184566],[42.345145,12.184377],[42.345115,12.184166],[42.34503,12.183957],[42.344988,12.183738],[42.344906,12.183603],[42.344853,12.1834],[42.344929,12.183163],[42.344885,12.182977],[42.344773,12.182765],[42.344665,12.182553],[42.344515,12.182435],[42.344369,12.182408],[42.344266,12.182571],[42.344169,12.182704],[42.344072,12.182769],[42.343966,12.182798],[42.343795,12.182806],[42.343701,12.182857],[42.343576,12.182847],[42.343532,12.182954],[42.343426,12.18296],[42.343321,12.183023],[42.343219,12.183016],[42.343114,12.182794],[42.34302,12.182654],[42.342954,12.182433],[42.342835,12.182213],[42.34267,12.182051],[42.342612,12.181871],[42.342494,12.181739],[42.342345,12.18164],[42.342264,12.181577],[42.342202,12.181439],[42.342068,12.181379],[42.342049,12.181221],[42.342079,12.181183]]},
+  {id:10,file:"gpx/Tra_i_sassi_del_predicatore_e_la_selva_di_Malano.gpx",name:"Sassi del Predicatore",sub:"Selva di Malano",type:"Trekking naturalistico",color:"#6e7ab5",km:"3.3",elev:"+288m",time:"2h 30min",diff:"med",desc:"Tra i Sassi del Predicatore e la Selva di Malano: un percorso affascinante tra formazioni rocciose vulcaniche, boschi ombrosi e paesaggi tipici della Tuscia profonda.",coords:[[42.485618,12.22337],[42.486035,12.224238],[42.486261,12.224025],[42.486664,12.223721],[42.487106,12.223517],[42.487478,12.223525],[42.487603,12.223461],[42.487977,12.223483],[42.488547,12.223428],[42.488787,12.223594],[42.488315,12.223754],[42.487877,12.224468],[42.488402,12.225281],[42.487737,12.226029],[42.487004,12.226548],[42.486902,12.226414],[42.487578,12.226178],[42.488108,12.226161],[42.488616,12.226133],[42.488953,12.22649],[42.489022,12.226553],[42.489021,12.226506],[42.48911,12.226518],[42.48917,12.226485],[42.489322,12.226473],[42.489612,12.226542],[42.489868,12.226751],[42.490119,12.226836],[42.490342,12.2269],[42.490304,12.226817],[42.490496,12.226687],[42.490437,12.226345],[42.490377,12.226064],[42.490231,12.225752],[42.490163,12.225506],[42.490292,12.225247],[42.490518,12.225079],[42.490721,12.224921],[42.491013,12.224756],[42.491199,12.224529],[42.491258,12.224334],[42.491298,12.223967],[42.491375,12.223678],[42.491412,12.223493],[42.491463,12.223278],[42.491488,12.223222],[42.491378,12.223118],[42.491149,12.222981],[42.490964,12.223195],[42.490849,12.223196],[42.490867,12.222852],[42.490932,12.222488],[42.490991,12.222226],[42.490855,12.221947],[42.49065,12.221761],[42.490375,12.221538],[42.490127,12.221406],[42.489827,12.221335],[42.489547,12.221023],[42.489295,12.220794],[42.489051,12.220633],[42.488774,12.220514],[42.488603,12.220374],[42.48835,12.220225],[42.488066,12.220122],[42.488013,12.219298],[42.488014,12.219974],[42.486508,12.21896],[42.485952,12.219021],[42.485333,12.22043],[42.48533,12.220576],[42.485071,12.220644],[42.484916,12.220606],[42.484803,12.22061],[42.484585,12.22064],[42.48439,12.220691],[42.484157,12.220789],[42.48396,12.220863],[42.484003,12.22113],[42.483971,12.221417],[42.483942,12.221726],[42.483938,12.222105],[42.483917,12.222396],[42.48389,12.222784],[42.485009,12.223247]]}
+];
+
+const DL={easy:'Facile',med:'Medio',hard:'Difficile'};
+const DC={easy:'c-easy',med:'c-med',hard:'c-hard'};
+let filter='all', map, sheetOpen=false;
+
+window.addEventListener('load',()=>{
+  document.getElementById('loading').classList.add('hidden');
+
+  map=L.map('map',{center:[42.30,12.05],zoom:9,tap:true,zoomControl:true});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19
+  }).addTo(map);
+
+  trails.forEach(t=>{
+    t._line=L.polyline(t.coords,{color:t.color,weight:5,opacity:0.9,smoothFactor:1}).addTo(map);
+    t._line.on('click',()=>{closeSheet();openDetail(t);});
+  });
+
+  buildList();
+
+  document.getElementById('sh-handle').addEventListener('click',toggleSheet);
+  document.getElementById('btnx').addEventListener('click',closeDetail);
+  document.getElementById('ov').addEventListener('click',()=>{closeDetail();closeSheet();});
+
+  document.querySelectorAll('.fp').forEach(b=>{
+    b.addEventListener('click',()=>{
+      filter=b.dataset.f;
+      document.querySelectorAll('.fp').forEach(x=>x.className='fp');
+      b.classList.add('a-'+filter);
+      applyFilter();
+    });
+  });
+});
+
+function buildList(){
+  const l=document.getElementById('trail-list');
+  l.innerHTML='';
+  trails.forEach(t=>{
+    const r=document.createElement('div');
+    r.className='trow'; r.id='r'+t.id;
+    r.innerHTML=`<div class="tbar" style="background:${t.color}"></div>
+      <div class="tinfo">
+        <div class="tname">${t.name}</div>
+        <div class="tmeta"><span>📏 ${t.km} km</span><span>⛰️ ${t.elev}</span><span>⏱️ ${t.time}</span></div>
+      </div>
+      <div class="chip ${DC[t.diff]}">${DL[t.diff]}</div>`;
+    r.addEventListener('click',()=>{
+      closeSheet();
+      map.fitBounds(t._line.getBounds(),{padding:[60,60]});
+      setTimeout(()=>openDetail(t),400);
+    });
+    l.appendChild(r);
+  });
+}
+
+function applyFilter(){
+  let n=0;
+  trails.forEach(t=>{
+    const ok=filter==='all'||t.diff===filter;
+    document.getElementById('r'+t.id)?.classList.toggle('dim',!ok);
+    t._line.setStyle({opacity:ok?0.9:0.08,weight:ok?5:2});
+    if(ok)n++;
+  });
+  document.getElementById('cnt').textContent=n+' percorsi';
+}
+
+function toggleSheet(){sheetOpen?closeSheet():openSheet();}
+function openSheet(){
+  sheetOpen=true;
+  document.getElementById('sheet').classList.add('open');
+  document.getElementById('ov').classList.add('on');
+  document.getElementById('sh-label').textContent='Tocca per chiudere';
+}
+function closeSheet(){
+  sheetOpen=false;
+  document.getElementById('sheet').classList.remove('open');
+  if(!document.getElementById('detail').classList.contains('open'))
+    document.getElementById('ov').classList.remove('on');
+  document.getElementById('sh-label').textContent='Scorri per i percorsi';
+}
+
+function openDetail(t){
+  trails.forEach(x=>x._line.setStyle({weight:4,opacity:0.5}));
+  t._line.setStyle({weight:7,opacity:1});
+  document.getElementById('dstrip').style.background=t.color;
+  document.getElementById('dtype').textContent=t.type;
+  document.getElementById('dname').textContent=t.name;
+  document.getElementById('dsub').textContent=t.sub||'';
+  document.getElementById('d-km').textContent=t.km+' km';
+  document.getElementById('d-el').textContent=t.elev;
+  document.getElementById('d-t').textContent=t.time;
+  document.getElementById('d-df').textContent=DL[t.diff];
+  document.getElementById('ddesc').textContent=t.desc;
+  document.getElementById('btndl').href=t.file;
+  document.getElementById('btndl').download=t.file.split('/').pop();
+  document.getElementById('detail').classList.add('open');
+  document.getElementById('ov').classList.add('on');
+}
+
+function closeDetail(){
+  document.getElementById('detail').classList.remove('open');
+  document.getElementById('ov').classList.remove('on');
+  trails.forEach(t=>{
+    const ok=filter==='all'||t.diff===filter;
+    t._line.setStyle({weight:5,opacity:ok?0.9:0.08});
+  });
+}
+</script>
+</body>
+</html>
